@@ -794,8 +794,8 @@ static int snd_compr_effect(struct snd_compr_stream *stream, unsigned long arg)
    struct dsp_effect_param q6_param;
    void *payload;
 
-   pr_aud_info("compress_offload snd_compr_effect +++\n");
-   pr_aud_info("[%p] SNDRV_COMPRESS_ENABLE_EFFECT\n", __func__);
+   pr_info("compress_offload snd_compr_effect +++\n");
+   pr_info("[%p] SNDRV_COMPRESS_ENABLE_EFFECT\n", __func__);
    if (copy_from_user(&q6_param, (void *) arg,
                sizeof(q6_param))) {
        pr_err("[%p] %s: copy param from user failed\n",
@@ -830,7 +830,7 @@ static int snd_compr_effect(struct snd_compr_stream *stream, unsigned long arg)
            pr_err("[%p] %s: config_effect error %d\n", prtd, __func__, rc);
        }
    }
-   pr_aud_info("compress_offload snd_compr_effect ---\n");
+   pr_info("compress_offload snd_compr_effect ---\n");
    kfree(payload);
    return 0;
 }

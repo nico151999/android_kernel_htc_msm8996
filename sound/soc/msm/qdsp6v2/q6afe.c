@@ -30,13 +30,6 @@
 
 #define WAKELOCK_TIMEOUT	5000
 
-#undef pr_debug
-#undef pr_info
-#undef pr_err
-#define pr_debug(fmt, ...) pr_aud_debug(fmt, ##__VA_ARGS__)
-#define pr_info(fmt, ...) pr_aud_info(fmt, ##__VA_ARGS__)
-#define pr_err(fmt, ...) pr_aud_err(fmt, ##__VA_ARGS__)
-
 enum {
 	AFE_COMMON_RX_CAL = 0,
 	AFE_COMMON_TX_CAL,
@@ -873,9 +866,6 @@ static int afe_spk_ramp_dn_cfg(int port)
 	if (!ret) {
 		pr_err("%s: wait_event timeout\n", __func__);
 		ret = -EINVAL;
-#ifdef CONFIG_HTC_DEBUG_DSP
-		BUG();
-#endif
 		goto fail_cmd;
 	}
 	if (atomic_read(&this_afe.status) > 0) {
@@ -983,9 +973,6 @@ static int afe_spk_prot_prepare(int src_port, int dst_port, int param_id,
 	if (!ret) {
 		pr_err("%s: wait_event timeout\n", __func__);
 		ret = -EINVAL;
-#ifdef CONFIG_HTC_DEBUG_DSP
-		BUG();
-#endif
 		goto fail_cmd;
 	}
 	if (atomic_read(&this_afe.status) > 0) {
@@ -1536,7 +1523,7 @@ static int afe_send_codec_reg_page_config(
 static int afe_send_codec_reg_config(
 	struct afe_param_cdc_reg_cfg_data *cdc_reg_cfg)
 {
-	int i, j, ret;
+	int i, j, ret = 0;
 	int pkt_size, payload_size, reg_per_pkt, num_pkts, num_regs;
 	struct afe_svc_cmd_cdc_reg_cfg *config;
 	struct afe_svc_cmd_set_param *param;
@@ -2068,9 +2055,6 @@ int afe_send_spdif_clk_cfg(struct afe_param_id_spdif_clk_cfg *cfg,
 		pr_err("%s: wait_event timeout\n",
 				__func__);
 		ret = -EINVAL;
-#ifdef CONFIG_HTC_DEBUG_DSP
-		BUG();
-#endif
 		goto fail_cmd;
 	}
 	if (atomic_read(&this_afe.status) > 0) {
@@ -2150,9 +2134,6 @@ int afe_send_spdif_ch_status_cfg(struct afe_param_id_spdif_ch_status_cfg
 	if (!ret) {
 		pr_err("%s: wait_event timeout\n",
 				__func__);
-#ifdef CONFIG_HTC_DEBUG_DSP
-		BUG();
-#endif
 		ret = -EINVAL;
 		goto fail_cmd;
 	}
@@ -3817,9 +3798,6 @@ int afe_cmd_memory_map(phys_addr_t dma_addr_p, u32 dma_buf_sz)
 				 msecs_to_jiffies(TIMEOUT_MS));
 	if (!ret) {
 		pr_err("%s: wait_event timeout\n", __func__);
-#ifdef CONFIG_HTC_DEBUG_DSP
-		BUG();
-#endif
 		ret = -EINVAL;
 		goto fail_cmd;
 	}

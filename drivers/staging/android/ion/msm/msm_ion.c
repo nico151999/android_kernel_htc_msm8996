@@ -153,43 +153,6 @@ int msm_ion_do_cache_op(struct ion_client *client, struct ion_handle *handle,
 }
 EXPORT_SYMBOL(msm_ion_do_cache_op);
 
-static atomic_t ion_alloc_mem_usages[ION_USAGE_MAX]
-			= {[0 ... ION_USAGE_MAX-1] = ATOMIC_INIT(0)};
-
-static inline atomic_t* ion_get_meminfo(const enum ion_heap_mem_usage usage)
-{
-	return (usage < ION_USAGE_MAX) ?
-			&ion_alloc_mem_usages[usage] : NULL;
-}
-
-void ion_alloc_inc_usage(const enum ion_heap_mem_usage usage,
-			 const size_t size)
-{
-	atomic_t * const ion_alloc_usage = ion_get_meminfo(usage);
-
-	if (ion_alloc_usage)
-		atomic_add(size, ion_alloc_usage);
-}
-EXPORT_SYMBOL(ion_alloc_inc_usage);
-
-void ion_alloc_dec_usage(const enum ion_heap_mem_usage usage,
-			 const size_t size)
-{
-	atomic_t * const ion_alloc_usage = ion_get_meminfo(usage);
-
-	if (ion_alloc_usage)
-		atomic_sub(size, ion_alloc_usage);
-}
-EXPORT_SYMBOL(ion_alloc_dec_usage);
-
-uintptr_t msm_ion_heap_meminfo(const bool is_total)
-{
-	atomic_t * const ion_alloc_usage = ion_get_meminfo(
-						is_total? ION_TOTAL : ION_IN_USE);
-	return ion_alloc_usage? atomic_read(ion_alloc_usage) * PAGE_SIZE : 0;
-}
-EXPORT_SYMBOL(msm_ion_heap_meminfo);
-
 static int ion_no_pages_cache_ops(struct ion_client *client,
 			struct ion_handle *handle,
 			void *vaddr,
@@ -742,7 +705,7 @@ long msm_ion_custom_ioctl(struct ion_client *client,
 		} else {
 			handle = ion_import_dma_buf(client, data.flush_data.fd);
 			if (IS_ERR(handle)) {
-				pr_info("%s: Could not import handle: %p\n",
+				pr_info("%s: Could not import handle: %pK\n",
 					__func__, handle);
 				return -EINVAL;
 			}
@@ -755,7 +718,7 @@ long msm_ion_custom_ioctl(struct ion_client *client,
 			+ data.flush_data.length;
 
 		if (start && check_vaddr_bounds(start, end)) {
-			pr_err("%s: virtual address %p is out of bounds\n",
+			pr_err("%s: virtual address %pK is out of bounds\n",
 				__func__, data.flush_data.vaddr);
 			ret = -EINVAL;
 		} else {

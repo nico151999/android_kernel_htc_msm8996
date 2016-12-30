@@ -25,10 +25,6 @@
 #include <linux/delay.h>
 #include <linux/qpnp/power-on.h>
 #include <linux/of_address.h>
-#include <linux/console.h>
-#ifdef CONFIG_HTC_POWER_DEBUG
-#include <linux/htc_flags.h>
-#endif
 
 #include <asm/cacheflush.h>
 #include <asm/system_misc.h>
@@ -51,11 +47,6 @@
 #define SCM_EDLOAD_MODE			0X01
 #define SCM_DLOAD_CMD			0x10
 
-#ifdef CONFIG_HTC_POWER_DEBUG
-extern void debug_htc_dump_pon_reg(void);
-#endif
-extern void msm_watchdog_bark(void);
-
 static int restart_mode;
 static bool scm_pmic_arbiter_disable_supported;
 static bool scm_deassert_ps_hold_supported;
@@ -74,24 +65,12 @@ static int download_mode = 1;
 static const int download_mode;
 #endif
 
-static int in_panic;
-static int panic_prep_restart(struct notifier_block *this,
-			      unsigned long event, void *ptr)
-{
-	in_panic = 1;
-	return NOTIFY_DONE;
-}
-
-static struct notifier_block panic_blk = {
-	.notifier_call	= panic_prep_restart,
-};
-
-static int is_warm_reset = 0;
-
 #ifdef CONFIG_MSM_DLOAD_MODE
 #define EDL_MODE_PROP "qcom,msm-imem-emergency_download_mode"
 #define DL_MODE_PROP "qcom,msm-imem-download_mode"
 
+static int in_panic;
+static int is_warm_reset = 0;
 static void *dload_mode_addr;
 static bool dload_mode_enabled;
 static void *emergency_dload_mode_addr;
@@ -116,6 +95,17 @@ struct reset_attribute {
 
 module_param_call(download_mode, dload_set, param_get_int,
 			&download_mode, 0644);
+
+static int panic_prep_restart(struct notifier_block *this,
+			      unsigned long event, void *ptr)
+{
+	in_panic = 1;
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block panic_blk = {
+	.notifier_call	= panic_prep_restart,
+};
 
 int scm_set_dload_mode(int arg1, int arg2)
 {
@@ -251,30 +241,12 @@ void msm_set_restart_mode(int mode)
 }
 EXPORT_SYMBOL(msm_set_restart_mode);
 
-static void msm_flush_console(void)
-{
-	unsigned long flags;
-
-	printk("\n");
-	printk(KERN_EMERG "[K] Restarting %s\n", linux_banner);
-	if (console_trylock()) {
-		console_unlock();
-		return;
-	}
-
-	mdelay(50);
-
-	local_irq_save(flags);
-
-	if (console_trylock())
-		printk(KERN_EMERG "[K] restart: Console was locked! Busting\n");
-	else
-		printk(KERN_EMERG "[K] restart: Console was locked!\n");
-	console_unlock();
-
-	local_irq_restore(flags);
-}
-
+/*
+ * Force the SPMI PMIC arbiter to shutdown so that no more SPMI transactions
+ * are sent from the MSM to the PMIC.  This is required in order to avoid an
+ * SPMI lockup on certain PMIC chips if PS_HOLD is lowered in the middle of
+ * an SPMI transaction.
+ */
 static void halt_spmi_pmic_arbiter(void)
 {
 	struct scm_desc desc = {
@@ -311,10 +283,6 @@ static enum pon_power_off_type htc_restart_cmd_to_type(const char* cmd)
                 {"oem-97", PON_POWER_OFF_WARM_RESET},
                 {"oem-98", PON_POWER_OFF_WARM_RESET},
                 {"oem-99", PON_POWER_OFF_WARM_RESET},
-#ifdef CONFIG_HTC_HANG_DETECT_RESTART
-		{"oem-aa", PON_POWER_OFF_WARM_RESET},
-		{"oem-ab", PON_POWER_OFF_WARM_RESET},
-#endif
         };
 
         if (in_panic)
@@ -343,8 +311,6 @@ static void msm_restart_prepare(char mode, const char *cmd)
 			(in_panic || restart_mode == RESTART_DLOAD ||
 				htc_restart_cmd_to_type(cmd) == PON_POWER_OFF_WARM_RESET));
 #endif
-
-	pr_info("%s: restart by command: [%s]\r\n", __func__, (cmd) ? cmd : "");
 
 	if (qpnp_pon_check_hard_reset_stored()) {
 		/* Set warm reset as true when device is in dload mode */
@@ -397,13 +363,6 @@ static void msm_restart_prepare(char mode, const char *cmd)
 		} else if (!strncmp(cmd, "oem-", 4)) {
 			unsigned long code;
 			code = simple_strtoul(cmd + 4, NULL, 16) & 0xff;
-#ifdef CONFIG_HTC_HANG_DETECT_RESTART
-			if (code == 0xaa) {
-				set_restart_to_oem(code, "framework hanging detected");
-			} else if (code == 0xab)
-				set_restart_to_oem(code, "framework hanging detected, dumpstate failed");
-			else
-#endif
 				set_restart_to_oem(code, NULL);
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
@@ -420,7 +379,6 @@ static void msm_restart_prepare(char mode, const char *cmd)
 		set_restart_action(RESTART_REASON_REBOOT, NULL);
 	}
 
-	msm_flush_console();
 	flush_cache_all();
 
 	/*outer_flush_all is not supported by 64bit kernel*/
@@ -430,9 +388,6 @@ static void msm_restart_prepare(char mode, const char *cmd)
 
 	if (cmd && !strncmp(cmd, "force-dog-bark", 14)) {
 		pr_info("%s: Force dog bark!\r\n", __func__);
-#if defined(CONFIG_HTC_DEBUG_WATCHDOG)
-		msm_watchdog_bark();
-#endif
 		mdelay(10000);
 		pr_info("%s: Force Watchdog bark does not work, falling back to normal process.\r\n" , __func__);
 	}
@@ -452,11 +407,6 @@ static void deassert_ps_hold(void)
 		.arginfo = SCM_ARGS(1),
 	};
 
-#ifdef CONFIG_HTC_POWER_DEBUG
-	if(get_kernel_flag() & KERNEL_FLAG_SERIAL_HSL_ENABLE)
-		debug_htc_dump_pon_reg();
-#endif
-
 	if (scm_deassert_ps_hold_supported) {
 		/* This call will be available on ARMv8 only */
 		scm_call2_atomic(SCM_SIP_FNID(SCM_SVC_PWR,
@@ -469,7 +419,7 @@ static void deassert_ps_hold(void)
 
 static void do_msm_restart(enum reboot_mode reboot_mode, const char *cmd)
 {
-	pr_notice("[K] Going down for restart now\n");
+	pr_notice("Going down for restart now\n");
 
 	msm_restart_prepare((char)reboot_mode, cmd);
 
@@ -492,7 +442,7 @@ static void do_msm_restart(enum reboot_mode reboot_mode, const char *cmd)
 
 static void do_msm_poweroff(void)
 {
-	pr_notice("[K] Powering off the SoC\n");
+	pr_notice("Powering off the SoC\n");
 	set_dload_mode(0);
 	scm_disable_sdi();
 	qpnp_pon_system_pwr_off(PON_POWER_OFF_SHUTDOWN);

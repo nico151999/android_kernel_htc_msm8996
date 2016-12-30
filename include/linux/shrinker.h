@@ -22,7 +22,6 @@ struct shrink_control {
 	nodemask_t nodes_to_scan;
 	/* current node being shrunk (for NUMA aware shrinkers) */
 	int nid;
-	int order;
 };
 
 #define SHRINK_STOP (~0UL)

@@ -82,7 +82,7 @@ struct subsys_desc {
 	unsigned int wdog_bite_irq;
         int apps_reboot_gpio;
 	unsigned int generic_irq;
-        int force_stop_gpio;
+	int force_stop_gpio;
 	int ramdump_disable_gpio;
 	int shutdown_ack_gpio;
 	int ramdump_disable;
@@ -120,10 +120,6 @@ extern void htc_smp2p_notify_modem_app_reboot( bool enable );
 extern bool htc_check_modem_crash_status ( void );
 
 #if defined(CONFIG_MSM_SUBSYSTEM_RESTART)
-
-#if defined(CONFIG_HTC_DEBUG_SSR)
-void subsys_set_restart_reason(struct subsys_device *dev, const char *reason);
-#endif 
 
 #if defined(CONFIG_HTC_FEATURES_SSR)
 extern void subsys_set_enable_ramdump(struct subsys_device *dev, int enable);
@@ -167,13 +163,6 @@ void notify_proxy_unvote(struct device *device);
 void complete_err_ready(struct subsys_device *subsys);
 extern int wait_for_shutdown_ack(struct subsys_desc *desc);
 #else
-
-#if defined(CONFIG_HTC_DEBUG_SSR)
-static inline void subsys_set_restart_reason(struct subsys_device *dev, const char *reason)
-{
-	return;
-}
-#endif 
 
 static inline int subsys_get_restart_level(struct subsys_device *dev)
 {

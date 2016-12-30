@@ -33,6 +33,7 @@ static void inherit_derived_state(struct inode *parent, struct inode *child)
 	ci->top = pi->top;
 }
 
+/* helper function for derived state */
 void setup_derived_state(struct inode *inode, perm_t perm, userid_t userid,
                         uid_t uid, bool under_android, struct inode *top)
 {
@@ -92,7 +93,7 @@ void get_derived_permission_new(struct dentry *parent, struct dentry *dentry, st
 				/* App-specific directories inside; let anyone traverse */
 				info->perm = PERM_ANDROID_OBB;
 				info->top = &info->vfs_inode;
-				
+				/* Single OBB directory is always shared */
 			} else if (!strcasecmp(newdentry->d_name.name, "media")) {
 				/* App-specific directories inside; let anyone traverse */
 				info->perm = PERM_ANDROID_MEDIA;
@@ -150,9 +151,7 @@ void fixup_perms_recursive(struct dentry *dentry, const char* name, size_t len) 
 	} else 	if (descendant_may_need_fixup(info->perm)) {
 		mutex_lock(&dentry->d_inode->i_mutex);
 		list_for_each_entry(child, &dentry->d_subdirs, d_child) {
-				dget(child);
 				fixup_perms_recursive(child, name, len);
-				dput(child);
 		}
 		mutex_unlock(&dentry->d_inode->i_mutex);
 	}
@@ -186,6 +185,10 @@ inline void update_derived_permission_lock(struct dentry *dentry)
 		printk(KERN_ERR "sdcardfs: %s: invalid dentry\n", __func__);
 		return;
 	}
+	/* FIXME:
+	 * 1. need to check whether the dentry is updated or not
+	 * 2. remove the root dentry update
+	 */
 	if(IS_ROOT(dentry)) {
 		//setup_default_pre_root_state(dentry->d_inode);
 	} else {

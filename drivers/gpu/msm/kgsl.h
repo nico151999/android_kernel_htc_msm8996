@@ -27,7 +27,6 @@
 #include <linux/dma-attrs.h>
 #include <linux/uaccess.h>
 #include <asm/cacheflush.h>
-#include "kgsl_htc.h"
 
 /* The number of memstore arrays limits the number of contexts allowed.
  * If more contexts are needed, update multiple for MEMSTORE_SIZE
@@ -133,7 +132,6 @@ struct kgsl_driver {
 	unsigned int full_cache_threshold;
 	struct workqueue_struct *workqueue;
 	struct workqueue_struct *mem_workqueue;
-	struct kgsl_driver_htc_priv priv;
 };
 
 extern struct kgsl_driver kgsl_driver;
@@ -204,8 +202,6 @@ struct kgsl_memdesc {
 	struct dma_attrs attrs;
 	struct page **pages;
 	unsigned int page_count;
-
-	struct kgsl_process_private *private;
 };
 
 /*
@@ -216,7 +212,6 @@ struct kgsl_memdesc {
 #define KGSL_MEM_ENTRY_KERNEL 0
 #define KGSL_MEM_ENTRY_USER (KGSL_USER_MEM_TYPE_ADDR + 1)
 #define KGSL_MEM_ENTRY_ION (KGSL_USER_MEM_TYPE_ION + 1)
-#define KGSL_MEM_ENTRY_PAGE_ALLOC (KGSL_USER_MEM_TYPE_ION + 2)
 #define KGSL_MEM_ENTRY_MAX (KGSL_USER_MEM_TYPE_MAX + 1)
 
 /* symbolic table for trace and debugfs */
@@ -384,6 +379,9 @@ long kgsl_ioctl_gpuobj_set_info(struct kgsl_device_private *dev_priv,
 
 void kgsl_mem_entry_destroy(struct kref *kref);
 
+void kgsl_get_egl_counts(struct kgsl_mem_entry *entry,
+			int *egl_surface_count, int *egl_image_count);
+
 struct kgsl_mem_entry * __must_check
 kgsl_sharedmem_find(struct kgsl_process_private *private, uint64_t gpuaddr);
 
@@ -547,4 +545,19 @@ static inline void __user *to_user_ptr(uint64_t address)
 	return (void __user *)(uintptr_t)address;
 }
 
+static inline void kgsl_gpu_sysfs_add_link(struct kobject *dst,
+			struct kobject *src, const char *src_name,
+			const char *dst_name)
+{
+	struct kernfs_node *old;
+
+	if (dst == NULL || src == NULL)
+		return;
+
+	old = sysfs_get_dirent(src->sd, src_name);
+	if (IS_ERR_OR_NULL(old))
+		return;
+
+	kernfs_create_link(dst->sd, dst_name, old);
+}
 #endif /* __KGSL_H */
