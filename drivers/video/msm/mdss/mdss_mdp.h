@@ -55,6 +55,7 @@
 #define C1_B_Cb		1	/* B/Cb */
 #define C0_G_Y		0	/* G/luma */
 
+/* wait for 1 second for unexpected irq missing */
 #define KOFF_TIMEOUT msecs_to_jiffies(1000)
 
 #define OVERFETCH_DISABLE_TOP		BIT(0)
@@ -194,9 +195,13 @@ enum mdss_mdp_csc_type {
 	MDSS_MDP_CSC_YUV2RGB_601L,
 	MDSS_MDP_CSC_YUV2RGB_601FR,
 	MDSS_MDP_CSC_YUV2RGB_709L,
+	MDSS_MDP_CSC_YUV2RGB_2020L,
+	MDSS_MDP_CSC_YUV2RGB_2020FR,
 	MDSS_MDP_CSC_RGB2YUV_601L,
 	MDSS_MDP_CSC_RGB2YUV_601FR,
 	MDSS_MDP_CSC_RGB2YUV_709L,
+	MDSS_MDP_CSC_RGB2YUV_2020L,
+	MDSS_MDP_CSC_RGB2YUV_2020FR,
 	MDSS_MDP_CSC_YUV2YUV,
 	MDSS_MDP_CSC_RGB2RGB,
 	MDSS_MDP_MAX_CSC
@@ -456,7 +461,7 @@ struct mdss_mdp_ctl {
 	/* dynamic resolution switch during cont-splash handoff */
 	bool switch_with_handoff;
 
-	
+	/* HTC: */
 	struct mutex event_lock;
 };
 
@@ -1278,6 +1283,10 @@ static inline uint8_t pp_vig_csc_pipe_val(struct mdss_mdp_pipe *pipe)
 		return MDSS_MDP_CSC_YUV2RGB_601L;
 	case MDP_CSC_ITU_R_601_FR:
 		return MDSS_MDP_CSC_YUV2RGB_601FR;
+	case MDP_CSC_ITU_R_2020:
+		return MDSS_MDP_CSC_YUV2RGB_2020L;
+	case MDP_CSC_ITU_R_2020_FR:
+		return MDSS_MDP_CSC_YUV2RGB_2020FR;
 	case MDP_CSC_ITU_R_709:
 	default:
 		return  MDSS_MDP_CSC_YUV2RGB_709L;

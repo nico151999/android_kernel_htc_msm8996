@@ -34,6 +34,7 @@
 #include "sched.h"
 #include <trace/events/sched.h>
 
+
 /*
  * Targeted preemption latency for CPU-bound tasks:
  * (default: 6ms * (1 + ilog(ncpus)), units: nanoseconds)
@@ -2404,6 +2405,7 @@ unsigned int __read_mostly sched_freq_aggregate_threshold = 0;
 unsigned int __read_mostly sched_upmigrate;
 unsigned int __read_mostly sysctl_sched_upmigrate_pct = 80;
 
+
 /*
  * Big tasks, once migrated, will need to drop their bandwidth
  * consumption to less than sched_downmigrate before they are "down"
@@ -3230,6 +3232,7 @@ bias_to_prev_cpu(struct cpu_select_env *env, struct cluster_cpu_stats *stats)
 	 * p->last_switch_out_ts can denote last preemption time as well as
 	 * last sleep time.
 	 */
+
 	if (task->ravg.mark_start - task->last_switch_out_ts >=
 					sched_short_sleep_task_threshold)
 		return false;
@@ -3805,7 +3808,21 @@ int sched_hmp_proc_update_handler(struct ctl_table *table, int write,
 	int ret;
 	unsigned int old_val;
 	unsigned int *data = (unsigned int *)table->data;
-	int update_min_nice = 0;
+	int update_task_count = 0;
+
+	if (!sched_enable_hmp)
+		return 0;
+
+	/*
+	 * The policy mutex is acquired with cpu_hotplug.lock
+	 * held from cpu_up()->cpufreq_governor_interactive()->
+	 * sched_set_window(). So enforce the same order here.
+	 */
+	if (write && (data == &sysctl_sched_upmigrate_pct ||
+	    data == (unsigned int *)&sysctl_sched_upmigrate_min_nice)) {
+		update_task_count = 1;
+		get_online_cpus();
+	}
 
 	mutex_lock(&policy_mutex);
 
@@ -3813,7 +3830,7 @@ int sched_hmp_proc_update_handler(struct ctl_table *table, int write,
 
 	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
 
-	if (ret || !write || !sched_enable_hmp)
+	if (ret || !write)
 		goto done;
 
 	if (write && (old_val == *data))
@@ -3828,7 +3845,6 @@ int sched_hmp_proc_update_handler(struct ctl_table *table, int write,
 			ret = -EINVAL;
 			goto done;
 		}
-		update_min_nice = 1;
 	} else if (data != &sysctl_sched_select_prev_cpu_us) {
 		/*
 		 * all tunables other than min_nice and prev_cpu_us are
@@ -3842,6 +3858,7 @@ int sched_hmp_proc_update_handler(struct ctl_table *table, int write,
 		}
 	}
 
+
 	/*
 	 * Big task tunable change will need to re-classify tasks on
 	 * runqueue as big and set their counters appropriately.
@@ -3850,19 +3867,17 @@ int sched_hmp_proc_update_handler(struct ctl_table *table, int write,
 	 * includes taking runqueue lock of all online cpus and re-initiatizing
 	 * their big counter values based on changed criteria.
 	 */
-	if ((data == &sysctl_sched_upmigrate_pct || update_min_nice)) {
-		get_online_cpus();
+	if (update_task_count)
 		pre_big_task_count_change(cpu_online_mask);
-	}
 
 	set_hmp_defaults();
 
-	if ((data == &sysctl_sched_upmigrate_pct || update_min_nice)) {
+	if (update_task_count)
 		post_big_task_count_change(cpu_online_mask);
-		put_online_cpus();
-	}
 
 done:
+	if (update_task_count)
+		put_online_cpus();
 	mutex_unlock(&policy_mutex);
 	return ret;
 }

@@ -55,6 +55,9 @@ struct panel_id {
 
 #define DSC_PPS_LEN		128
 
+/* HDR propeties count */
+#define DISPLAY_PRIMARIES_COUNT	8	/* WRGB x and y values*/
+
 static inline const char *mdss_panel2str(u32 panel)
 {
 	static const char const *names[] = {
@@ -584,6 +587,16 @@ struct mdss_panel_roi_alignment {
 	u32 min_height;
 };
 
+/**
+ *  HTC: A Struct for Backlgith 1.0.
+ *  Apply on backlight_transfer function.
+ *  The function will base on brt_data and bl_data to transfer brt and bl value.
+ *  The brt and bl was direct map. For internal value, we will use interpolation method to get transfer value.
+ *
+ *  size: A value to save brt and bl table size.
+ *  brt_data: A point referring to brightness table related data.
+ *  bl_data: A point referring to backlight table related data
+ */
 struct htc_backlight1_table {
 	int size;
 	u16 *brt_data;
@@ -593,6 +606,19 @@ struct htc_backlight1_table {
 enum {
 	PANEL_POWER_CTRL_DEFAULT,
 	PANEL_POWER_CTRL_HX8396C2,
+};
+
+struct mdss_panel_hdr_properties {
+	bool hdr_enabled;
+
+	/* WRGB X and y values arrayed in format */
+	/* [WX, WY, RX, RY, GX, GY, BX, BY] */
+	u32 display_primaries[DISPLAY_PRIMARIES_COUNT];
+
+	/* peak brightness supported by panel */
+	u32 peak_brightness;
+	/* Blackness level supported by panel */
+	u32 blackness_level;
 };
 
 struct mdss_panel_info {
@@ -729,10 +755,13 @@ struct mdss_panel_info {
 	/* debugfs structure for the panel */
 	struct mdss_panel_debugfs_info *debugfs_info;
 
-	
+	/*HTC add as below*/
 	struct htc_backlight1_table brt_bl_table;
 	int camera_blk;
 	int power_ctrl;
+
+	/* HDR properties of display panel*/
+	struct mdss_panel_hdr_properties hdr_properties;
 };
 
 struct mdss_panel_timing {

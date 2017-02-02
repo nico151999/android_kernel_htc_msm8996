@@ -746,10 +746,10 @@ static void enable_all_irqs(struct subsys_device *dev)
 		irq_set_irq_wake(dev->desc->generic_irq, 1);
 	}
 
-#if 1 
+#if 1 //Modem_BSP++
         if (dev->desc->reboot_req_irq)
                 enable_irq(dev->desc->reboot_req_irq);
-#endif 
+#endif //Modem_BSP--
 }
 
 static void disable_all_irqs(struct subsys_device *dev)
@@ -770,10 +770,10 @@ static void disable_all_irqs(struct subsys_device *dev)
 		irq_set_irq_wake(dev->desc->generic_irq, 0);
 	}
 
-#if 1 
+#if 1 //Modem_BSP++
         if (dev->desc->reboot_req_irq)
                 disable_irq(dev->desc->reboot_req_irq);
-#endif 
+#endif //Modem_BSP--
 }
 
 static int wait_for_err_ready(struct subsys_device *subsys)
@@ -802,10 +802,11 @@ static void subsystem_shutdown(struct subsys_device *dev, void *data)
 {
 	const char *name = dev->desc->name;
 
-	pr_info("[%p]: Shutting down %s\n", current, name);
+	pr_info("[%s:%d]: Shutting down %s\n",
+			current->comm, current->pid, name);
 	if (dev->desc->shutdown(dev->desc, true) < 0)
-		panic("subsys-restart: [%p]: Failed to shutdown %s!",
-			current, name);
+		panic("subsys-restart: [%s:%d]: Failed to shutdown %s!",
+			current->comm, current->pid, name);
 	dev->crash_count++;
 	subsys_set_state(dev, SUBSYS_OFFLINE);
 	disable_all_irqs(dev);
@@ -817,7 +818,8 @@ static void subsystem_ramdump(struct subsys_device *dev, void *data)
 
 	if (dev->desc->ramdump)
 		if (dev->desc->ramdump(is_ramdump_enabled(dev), dev->desc) < 0)
-			pr_warn("%s[%p]: Ramdump failed.\n", name, current);
+			pr_warn("%s[%s:%d]: Ramdump failed.\n",
+				name, current->comm, current->pid);
 	dev->do_ramdump_on_put = false;
 }
 
@@ -832,13 +834,14 @@ static void subsystem_powerup(struct subsys_device *dev, void *data)
 	const char *name = dev->desc->name;
 	int ret;
 
-	pr_info("[%p]: Powering up %s\n", current, name);
+	pr_info("[%s:%d]: Powering up %s\n", current->comm, current->pid, name);
 	init_completion(&dev->err_ready);
 
 	if (dev->desc->powerup(dev->desc) < 0) {
 		notify_each_subsys_device(&dev, 1, SUBSYS_POWERUP_FAILURE,
 								NULL);
-		panic("[%p]: Powerup error: %s!", current, name);
+		panic("[%s:%d]: Powerup error: %s!",
+			current->comm, current->pid, name);
 	}
 	enable_all_irqs(dev);
 
@@ -846,8 +849,8 @@ static void subsystem_powerup(struct subsys_device *dev, void *data)
 	if (ret) {
 		notify_each_subsys_device(&dev, 1, SUBSYS_POWERUP_FAILURE,
 								NULL);
-		panic("[%p]: Timed out waiting for error ready: %s!",
-			current, name);
+		panic("[%s:%d]: Timed out waiting for error ready: %s!",
+			current->comm, current->pid, name);
 	}
 	subsys_set_state(dev, SUBSYS_ONLINE);
 	subsys_set_crash_status(dev, false);
@@ -1134,8 +1137,8 @@ static void subsystem_restart_wq_func(struct work_struct *work)
 	 */
 	mutex_lock(&soc_order_reg_lock);
 
-	pr_debug("[%p]: Starting restart sequence for %s\n", current,
-			desc->name);
+	pr_debug("[%s:%d]: Starting restart sequence for %s\n",
+			current->comm, current->pid, desc->name);
 	notify_each_subsys_device(list, count, SUBSYS_BEFORE_SHUTDOWN, NULL);
 	for_each_subsys_device(list, count, NULL, subsystem_shutdown);
 	notify_each_subsys_device(list, count, SUBSYS_AFTER_SHUTDOWN, NULL);
@@ -1156,8 +1159,8 @@ static void subsystem_restart_wq_func(struct work_struct *work)
 	for_each_subsys_device(list, count, NULL, subsystem_powerup);
 	notify_each_subsys_device(list, count, SUBSYS_AFTER_POWERUP, NULL);
 
-	pr_info("[%p]: Restart sequence for %s completed.\n",
-			current, desc->name);
+	pr_info("[%s:%d]: Restart sequence for %s completed.\n",
+			current->comm, current->pid, desc->name);
 
 	mutex_unlock(&soc_order_reg_lock);
 	mutex_unlock(&track->lock);
@@ -1704,12 +1707,12 @@ static int subsys_parse_devicetree(struct subsys_desc *desc)
 	if (ret && ret != -ENOENT)
 		return ret;
 
-#if 1 
+#if 1 //Modem_BSP++
 	ret = __get_irq(desc, "qcom,gpio-reboot-req", &desc->reboot_req_irq,
 							NULL);
 	if (ret && ret != -ENOENT)
 		return ret;
-#endif 
+#endif //Modem_BSP--
 
 	ret = __get_gpio(desc, "qcom,gpio-force-stop", &desc->force_stop_gpio);
 	if (ret && ret != -ENOENT)
@@ -1767,7 +1770,7 @@ static int subsys_setup_irqs(struct subsys_device *subsys)
 		disable_irq(desc->err_fatal_irq);
 	}
 
-#if 1 
+#if 1 //Modem_BSP++
 	if (desc->reboot_req_irq) {
 		ret = devm_request_irq(desc->dev, desc->reboot_req_irq,
 				desc->reboot_req_handler,
@@ -1779,7 +1782,7 @@ static int subsys_setup_irqs(struct subsys_device *subsys)
 		}
 		disable_irq(desc->reboot_req_irq);
 	}
-#endif 
+#endif //Modem_BSP--
 
 	if (desc->stop_ack_irq && desc->stop_ack_handler) {
 		ret = devm_request_irq(desc->dev, desc->stop_ack_irq,
@@ -1842,10 +1845,10 @@ static void subsys_free_irqs(struct subsys_device *subsys)
 	if (desc->err_fatal_irq && desc->err_fatal_handler)
 		devm_free_irq(desc->dev, desc->err_fatal_irq, desc);
 
-#if 1 
+#if 1 //Modem_BSP++
 	if (desc->reboot_req_irq)
 		devm_free_irq(desc->dev, desc->reboot_req_irq, desc);
-#endif 
+#endif //Modem_BSP--
 	
 	if (desc->stop_ack_irq && desc->stop_ack_handler)
 		devm_free_irq(desc->dev, desc->stop_ack_irq, desc);
